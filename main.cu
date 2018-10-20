@@ -4,6 +4,9 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <iostream>
 
+/**
+ * Struct representing a body 
+ */
 struct Body {
   float x, y, vx, vy;
 
@@ -19,15 +22,66 @@ struct Body {
   Body () {};
 };
 
+/**
+ * Image Coordinates
+ */
+struct ImageCoord {
+  unsigned int x, y, imageDim;
+
+  __host__ __device__
+  ImageCoord (
+      unsigned int _x,
+      unsigned int _y,
+      unsigned int _imageDim
+  ): x(_x), y(_y), imageDim(_imageDim) {};
+
+  __host__ __device__
+  ImageCoord (): x(0), y(0), imageDim(0) {};
+
+  __host__ __device__
+  ImageCoord (
+      const Body &body,
+      unsigned int _imageDim
+  ):  imageDim(_imageDim) {
+    auto halfImageDim = imageDim / 2;
+    x = (body.x + 1.) * halfImageDim;
+    y = (body.y + 1.) * halfImageDim;
+  };
+  
+  __host__
+  ImageCoord (
+      const Body &body,
+      unsigned int _imageDim,
+      bool ok
+  ):  imageDim(_imageDim) {
+    auto halfImageDim = imageDim / 2;
+    //std::cout << "IMAGE_DIM: " << imageDim << '\n';
+    //std::cout << "HALFDIM: " << halfImageDim << '\n';
+    x = (body.x + 1.) * halfImageDim;
+    y = (body.y + 1.) * halfImageDim;
+    //std::cout << "X: " << x << " Y: " << y << '\n';
+  };
+  
+  
+  __host__ __device__
+  unsigned int toOffset() {
+    return x + y * imageDim;
+  };
+};
+
+/**
+ * Program to initialize bodies with random values between -1,1
+ */
 struct initRandomPrg
 {
   float minValue, maxValue;
 
   __host__ __device__
-  initRandomPrg(float _mnV=0.f, float _mxV=1.f) : minValue(_mnV), maxValue(_mxV) {};
+  initRandomPrg(float _mnV=-1.f, float _mxV=1.f):
+    minValue(_mnV), maxValue(_mxV) {};
 
   __host__ __device__
-  Body operator()(const unsigned int n) const
+  Body operator()(const int n) const
   {
     thrust::default_random_engine rng;
     thrust::uniform_real_distribution<float> dist(minValue, maxValue);
@@ -40,63 +94,77 @@ struct initRandomPrg
   }
 };
 
-struct addPrg
+
+struct mapBodyToPixelCounts
 {
-  __host__ __device__
-  addPrg() {};
+  thrust::device_vector<unsigned int> *pixelCounts;
+  const unsigned int imageDim;
 
   __host__ __device__
-  Body operator()(const Body& a, const Body& b) const
+  mapBodyToPixelCounts(
+      unsigned int _imageDim,
+      thrust::device_vector<unsigned int> *_pixelCounts
+  ): imageDim(_imageDim), pixelCounts(_pixelCounts) {};
+
+  __device__
+  void operator()(const Body &body) const
   {
-    Body result(a);
-    result.x += b.x;
-    result.y += b.y;
-    return result;
+    auto offset = ImageCoord(body, imageDim).toOffset();
+    atomicAdd(&pixelCounts[offset], 1);
+    //const int &pixel = pixelCounts[offset];
+    //pixelCounts[offset] += 1;
   }
 };
 
 
 int main() {
-  int N = 8000 * 8000; // 800px x 800px image
-  int iterations = 10;
+  unsigned int const BODY_COUNT = 10e6;
+  unsigned int const IMAGE_DIM = 2000;
+  unsigned int const IMG_VECTOR_SIZE = IMAGE_DIM ^ 2;
 
-  auto x = thrust::device_vector<Body>(N);
-  auto y = thrust::device_vector<Body>(N);
-  auto output = thrust::device_vector<Body>(N);
-
-  // initilize array  
+  // initilize bodies
+  auto bodies = thrust::device_vector<Body>(BODY_COUNT);
   auto index_sequence_begin = thrust::counting_iterator<unsigned int>(0);
   
   thrust::transform(
       index_sequence_begin,
-      index_sequence_begin + N,
-      x.begin(),
+      index_sequence_begin + BODY_COUNT,
+      bodies.begin(),
       initRandomPrg()
+  );
+
+  std::cout << "Initialized Bodies" << "\n\n";
+ 
+  // initialize pixel counts 
+  auto pixelCounts = thrust::device_vector<unsigned int>(IMG_VECTOR_SIZE);
+  thrust::fill(pixelCounts.begin(), pixelCounts.end(), 0);
+  
+  std::cout << "Initialized Pxels" << "\n\n";
+  
+  // get pixel counts
+  thrust::for_each(
+      bodies.begin(),
+      bodies.end(),
+      mapBodyToPixelCounts(IMAGE_DIM, pixelCounts)
   );
   
-  thrust::transform(
-      index_sequence_begin,
-      index_sequence_begin + N,
-      y.begin(),
-      initRandomPrg()
-  );
+  std::cout << "Mapped Points to Pixels" << "\n\n";
 
+  for (auto i = 0; i < 10; i++) {
+    //ImageCoord bc = bodyCoords[i];
+    //std::cout << bc.x << ' ' << bc.y << "  ";
+    Body b = bodies[i];
+    auto offset = ImageCoord(b, IMAGE_DIM, true).toOffset();
 
-  // add them up
-  for (int i = 0; i < iterations; i++) {
-    thrust::transform(
-        x.begin(), x.end(),
-        y.begin(),
-        output.begin(),
-        //thrust::plus<float>()
-        addPrg()
-    );
+    std::cout << b.x << '\t' << b.y << '\t';
+    std::cout << offset << '\t';
+    // std::cout << pixelCounts[offset] << '\n';
   }
 
-  for (int i = 0; i < 10; i++) {
-    Body b = output[i];
-    std::cout << b.x << '\n';
-  }
+  std::cout << "Max Pixel Count: "
+    << thrust::reduce(pixelCounts.begin(), pixelCounts.end(), thrust::maximum<unsigned int>()) << '\n';
+
+  cudaFree(pixelCounts);
 
   return 0;
 }
