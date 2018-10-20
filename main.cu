@@ -97,13 +97,13 @@ struct initRandomPrg
 
 struct mapBodyToPixelCounts
 {
-  thrust::device_vector<unsigned int> *pixelCounts;
+  unsigned int *pixelCounts;
   const unsigned int imageDim;
 
   __host__ __device__
   mapBodyToPixelCounts(
       unsigned int _imageDim,
-      thrust::device_vector<unsigned int> *_pixelCounts
+      unsigned int *_pixelCounts
   ): imageDim(_imageDim), pixelCounts(_pixelCounts) {};
 
   __device__
@@ -111,8 +111,6 @@ struct mapBodyToPixelCounts
   {
     auto offset = ImageCoord(body, imageDim).toOffset();
     atomicAdd(&pixelCounts[offset], 1);
-    //const int &pixel = pixelCounts[offset];
-    //pixelCounts[offset] += 1;
   }
 };
 
@@ -120,7 +118,7 @@ struct mapBodyToPixelCounts
 int main() {
   unsigned int const BODY_COUNT = 10e6;
   unsigned int const IMAGE_DIM = 2000;
-  unsigned int const IMG_VECTOR_SIZE = IMAGE_DIM ^ 2;
+  unsigned int const IMG_VECTOR_SIZE = IMAGE_DIM * IMAGE_DIM;
 
   // initilize bodies
   auto bodies = thrust::device_vector<Body>(BODY_COUNT);
@@ -145,7 +143,7 @@ int main() {
   thrust::for_each(
       bodies.begin(),
       bodies.end(),
-      mapBodyToPixelCounts(IMAGE_DIM, pixelCounts)
+      mapBodyToPixelCounts(IMAGE_DIM, thrust::raw_pointer_cast(pixelCounts.data()))
   );
   
   std::cout << "Mapped Points to Pixels" << "\n\n";
@@ -157,14 +155,12 @@ int main() {
     auto offset = ImageCoord(b, IMAGE_DIM, true).toOffset();
 
     std::cout << b.x << '\t' << b.y << '\t';
-    std::cout << offset << '\t';
-    // std::cout << pixelCounts[offset] << '\n';
+    std::cout << offset << ' ' << IMG_VECTOR_SIZE << '\t';
+    std::cout << pixelCounts[offset];
+    std::cout << '\n';
   }
 
-  std::cout << "Max Pixel Count: "
-    << thrust::reduce(pixelCounts.begin(), pixelCounts.end(), thrust::maximum<unsigned int>()) << '\n';
-
-  cudaFree(pixelCounts);
-
+//  std::cout << "Max Pixel Count: "
+//    << thrust::reduce(pixelCounts.begin(), pixelCounts.end(), thrust::maximum<unsigned int>()) << '\n';
   return 0;
 }
