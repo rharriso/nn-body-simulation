@@ -3,8 +3,9 @@
 #include <thrust/functional.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <iostream>
+#include <opencv2/opencv.hpp>
 
-const int PIXEL_RGBA_RATIO = 4;
+const int PIXEL_RGBA_RATIO = 3;
 
 /**
  * Struct representing a body 
@@ -107,17 +108,19 @@ struct mapPixelCountToRGBA
   __host__ __device__
   void operator()(const unsigned int idx) {
     auto count = pixelCount_ptr[idx];
-    auto grayValue = min(BODY_COUNT_GRAYSCALE_RATIO * count, 255);
+    auto grayValue = min(BODY_COUNT_GRAYSCALE_RATIO * count, 127);
     // assign rgba values
     auto baseIdx = idx * PIXEL_RGBA_RATIO;
     image_ptr[baseIdx] = grayValue;
-    image_ptr[baseIdx + 1] = grayValue; image_ptr[baseIdx + 2] = grayValue; image_ptr[baseIdx + 3] = 0;
+    image_ptr[baseIdx + 1] = grayValue;
+    image_ptr[baseIdx + 2] = grayValue;
+    //image_ptr[baseIdx + 3] = 0;
   }
 };
 
 int main() {
   int const BODY_COUNT = 10e6;
-  int const IMAGE_DIM = 1000;
+  int const IMAGE_DIM = 500;
   int const BODY_COUNT_PIXEL_SIZE = IMAGE_DIM * IMAGE_DIM;
   int const RGBA_IMAGE_SIZE = IMAGE_DIM * PIXEL_RGBA_RATIO; // image has 4 values per pixels
 
@@ -167,12 +170,11 @@ int main() {
     auto red = (int)deviceImage[baseIdx]; 
     auto blue = (int)deviceImage[baseIdx + 1]; 
     auto green = (int)deviceImage[baseIdx + 2]; 
-    auto alpha = (int)deviceImage[baseIdx + 3]; 
+    // auto alpha = (int)deviceImage[baseIdx + 3]; 
 
     std::cout << b.x << '\t' << b.y << '\t';
     std::cout << offset << ' ' <<  bc.x << ',' << bc.y << "\t\t";
-    std::cout << pixelCounts[offset] << "\t\t";
-    std::cout << red << ", " <<  blue << ", " << green <<", " << alpha;
+    std::cout << red << ", " <<  blue << ", " << green;
     std::cout << '\n';
   }
 
@@ -184,5 +186,14 @@ int main() {
   std::cout << "Max Pixel Count: \t" << max << '\n';
   std::cout << "Body Count: \t\t" << BODY_COUNT << '\n';
 
+  // save image
+  auto hostImage = thrust::host_vector<unsigned char>(RGBA_IMAGE_SIZE);
+  thrust::fill(hostImage.begin(), hostImage.end(), 127);
+  auto hostImage_ptr = thrust::raw_pointer_cast(hostImage.data());
+  //hostImage = deviceImage; // copy device image to host
+  cv::Mat imageMat(IMAGE_DIM,IMAGE_DIM, CV_8UC3);
+  memcpy(imageMat.data, hostImage_ptr, sizeof(char) * RGBA_IMAGE_SIZE);
+
+  cv::imwrite("/home/rharriso/Desktop/Test.png", imageMat);
   return 0;
 }

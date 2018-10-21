@@ -10,5 +10,5 @@ prof: n-body
 	time -v ./n-body
 
 n-body: main.cu
-	${CC} -ccbin g++-6 main.cu -o n-body
+	${CC} -ccbin g++-6 main.cu -o n-body `pkg-config --libs opencv`
 
