@@ -122,7 +122,7 @@ int main() {
   int const BODY_COUNT = 10e6;
   int const IMAGE_DIM = 500;
   int const BODY_COUNT_PIXEL_SIZE = IMAGE_DIM * IMAGE_DIM;
-  int const RGBA_IMAGE_SIZE = IMAGE_DIM * PIXEL_RGBA_RATIO; // image has 4 values per pixels
+  int const RGBA_IMAGE_SIZE = BODY_COUNT_PIXEL_SIZE * PIXEL_RGBA_RATIO; // image has 4 values per pixels
 
 
   // initilize bodies
@@ -192,7 +192,7 @@ int main() {
   auto hostImage_ptr = thrust::raw_pointer_cast(hostImage.data());
   //hostImage = deviceImage; // copy device image to host
   cv::Mat imageMat(IMAGE_DIM,IMAGE_DIM, CV_8UC3);
-  memcpy(imageMat.data, hostImage_ptr, sizeof(char) * RGBA_IMAGE_SIZE);
+  memcpy(imageMat.data, hostImage_ptr, sizeof(unsigned char) * RGBA_IMAGE_SIZE);
 
   cv::imwrite("/home/rharriso/Desktop/Test.png", imageMat);
   return 0;
