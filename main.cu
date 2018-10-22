@@ -3,6 +3,7 @@
 #include <thrust/functional.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <iostream>
+#include <ctime>
 #include <opencv2/opencv.hpp>
 
 const int PIXEL_RGBA_RATIO = 3;
@@ -56,14 +57,16 @@ struct ImageCoord {
 struct initRandomPrg
 {
   float minValue, maxValue;
+  int seed;
 
   __host__ __device__
-    initRandomPrg(float _mnV=-1.f, float _mxV=1.f): minValue(_mnV), maxValue(_mxV) {};
+    initRandomPrg(int _seed=0, float _mnV=-1.f, float _mxV=1.f):
+      seed(_seed), minValue(_mnV), maxValue(_mxV) {};
 
   __host__ __device__
     Body operator()(const unsigned int idx) const
     {
-      thrust::default_random_engine rng;
+      thrust::default_random_engine rng(seed);
       thrust::uniform_real_distribution<float> dist(minValue, maxValue);
       rng.discard(idx);
 
@@ -96,7 +99,7 @@ struct mapBodyToPixelCounts
 
 struct mapPixelCountToRGBA
 {
-  const int BODY_COUNT_GRAYSCALE_RATIO = 5; // like 12 points in white
+  const int BODY_COUNT_GRAYSCALE_RATIO = 1; // like 12 points in white
   const int *pixelCount_ptr;
   unsigned char *image_ptr;
   __host__ __device__
@@ -118,9 +121,15 @@ struct mapPixelCountToRGBA
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    std::cerr << "Usage: n-body [output file]" << std::endl;
+    return 1;
+  }
+
+
   int const BODY_COUNT = 10e6;
-  int const IMAGE_DIM = 2000;
+  int const IMAGE_DIM = 400;
   int const PIXEL_COUNT = IMAGE_DIM * IMAGE_DIM;
   int const RGBA_IMAGE_SIZE = PIXEL_COUNT * PIXEL_RGBA_RATIO; // image has 4 values per pixels
 
@@ -133,7 +142,7 @@ int main() {
       index_sequence_begin,
       index_sequence_begin + BODY_COUNT,
       bodies.begin(),
-      initRandomPrg()
+      initRandomPrg(std::time(0))
       );
 
   std::cout << "Initialized Bodies" << "\n\n";
@@ -197,6 +206,7 @@ int main() {
   cv::Mat imageMat(IMAGE_DIM,IMAGE_DIM, CV_8UC3);
   memcpy(imageMat.data, hostImage_ptr, sizeof(unsigned char) * RGBA_IMAGE_SIZE);
 
-  cv::imwrite("/home/rharriso/Desktop/Test.png", imageMat);
+  //cv::imwrite("/home/rharriso/Desktop/Test.png", imageMat);
+  cv::imwrite(argv[1], imageMat);
   return 0;
 }
