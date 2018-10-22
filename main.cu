@@ -9,16 +9,14 @@
 const int PIXEL_RGBA_RATIO = 3;
 
 /**
- * Struct representing a body 
+ * Struct representing a body
  */
 struct Body {
   float x, y, vx, vy;
 
   __host__ __device__
-    Body (const Body &otherBody):
-      x(otherBody.x), y(otherBody.y), vx(otherBody.vx), vy(otherBody.vy) {};
-  __host__ __device__
-    Body (float _x, float _y, float _vx, float _vy): x(_x), y(_y), vx(_vx), vy(_vy) {};
+    Body (float _x, float _y, float _vx, float _vy):
+      x(_x), y(_y), vx(_vx), vy(_vy) {};
   __host__ __device__
     Body () {};
 };
@@ -117,7 +115,6 @@ struct mapPixelCountToRGBA
     image_ptr[baseIdx] = grayValue;
     image_ptr[baseIdx + 1] = grayValue;
     image_ptr[baseIdx + 2] = grayValue;
-    //image_ptr[baseIdx + 3] = 0;
   }
 };
 
@@ -127,27 +124,25 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-
   int const BODY_COUNT = 10e6;
   int const IMAGE_DIM = 400;
   int const PIXEL_COUNT = IMAGE_DIM * IMAGE_DIM;
   int const RGBA_IMAGE_SIZE = PIXEL_COUNT * PIXEL_RGBA_RATIO; // image has 4 values per pixels
-
 
   // initilize bodies
   auto bodies = thrust::device_vector<Body>(BODY_COUNT);
   auto index_sequence_begin = thrust::counting_iterator<unsigned int>(0);
 
   thrust::transform(
-      index_sequence_begin,
-      index_sequence_begin + BODY_COUNT,
-      bodies.begin(),
-      initRandomPrg(std::time(0))
-      );
+    index_sequence_begin,
+    index_sequence_begin + BODY_COUNT,
+    bodies.begin(),
+    initRandomPrg(std::time(0))
+  );
 
   std::cout << "Initialized Bodies" << "\n\n";
 
-  // initialize pixel counts 
+  // initialize pixel counts
   auto pixelCounts = thrust::device_vector<int>(PIXEL_COUNT);
   auto pixelCount_ptr = thrust::raw_pointer_cast(pixelCounts.data());
   thrust::fill(pixelCounts.begin(), pixelCounts.end(), 0);
@@ -155,18 +150,22 @@ int main(int argc, char **argv) {
   std::cout << "Initialized Pxels" << "\n\n";
 
   // get pixel counts
-  thrust::for_each(bodies.begin(), bodies.end(), mapBodyToPixelCounts(IMAGE_DIM, pixelCount_ptr));
+  thrust::for_each(
+    bodies.begin(), bodies.end(),
+    mapBodyToPixelCounts(IMAGE_DIM, pixelCount_ptr)
+  );
 
   std::cout << "Mapped Points to Pixels" << "\n\n";
 
   auto deviceImage = thrust::device_vector<unsigned char>(RGBA_IMAGE_SIZE);
   auto deviceImage_ptr = thrust::raw_pointer_cast(deviceImage.data());
-  
+  thrust::fill(deviceImage.begin(), deviceImage.end(), 0);
+
   thrust::for_each(
     index_sequence_begin,
     index_sequence_begin + PIXEL_COUNT,
     mapPixelCountToRGBA(pixelCount_ptr, deviceImage_ptr)
-  ); 
+  );
 
   std::cout << "Initialized Image Pixels" << "\n\n";
 
@@ -176,10 +175,9 @@ int main(int argc, char **argv) {
     auto offset = ImageCoord(b, IMAGE_DIM).toOffset();
     auto baseIdx = i * PIXEL_RGBA_RATIO;
 
-    auto red = (int)deviceImage[baseIdx]; 
-    auto blue = (int)deviceImage[baseIdx + 1]; 
-    auto green = (int)deviceImage[baseIdx + 2]; 
-    // auto alpha = (int)deviceImage[baseIdx + 3]; 
+    auto red = (int)deviceImage[baseIdx];
+    auto blue = (int)deviceImage[baseIdx + 1];
+    auto green = (int)deviceImage[baseIdx + 2];
 
     std::cout << b.x << '\t' << b.y << '\t';
     std::cout << offset << ' ' <<  bc.x << ',' << bc.y << "\t\t";
@@ -192,21 +190,30 @@ int main(int argc, char **argv) {
       0, thrust::maximum<int>()
   );
 
+  auto min = thrust::reduce(
+      pixelCounts.begin(), pixelCounts.end(),
+      0, thrust::minimum<int>()
+  );
+
+  auto minColor = thrust::reduce(
+      deviceImage.begin(), deviceImage.end(),
+      0, thrust::minimum<int>()
+  );
+
   std::cout << "Max Pixel Count: \t" << max << '\n';
+  std::cout << "Min Pixel Count: \t" << min << '\n';
+  std::cout << "Min Pixel Value: \t" << minColor << '\n';
   std::cout << "Body Count: \t\t" << BODY_COUNT << '\n';
 
-  // save image
+  // copy image to host
   auto hostImage = thrust::host_vector<unsigned char>(RGBA_IMAGE_SIZE);
-  // thrust::fill(hostImage.begin(), hostImage.end(), 127);
-  auto hostImage_ptr = thrust::raw_pointer_cast(hostImage.data());
-  //thrust::copy(hostImage.begin(), hostImage.end(), deviceImage.begin());
-  cudaDeviceSynchronize();
-  cudaMemcpy(hostImage_ptr, deviceImage_ptr, RGBA_IMAGE_SIZE, cudaMemcpyDeviceToHost);
+  thrust::copy(deviceImage.begin(), deviceImage.end(), hostImage.begin());
 
-  cv::Mat imageMat(IMAGE_DIM,IMAGE_DIM, CV_8UC3);
+  // copy host image to matrix
+  auto hostImage_ptr = thrust::raw_pointer_cast(hostImage.data());
+  cv::Mat imageMat(IMAGE_DIM, IMAGE_DIM, CV_8UC3);
   memcpy(imageMat.data, hostImage_ptr, sizeof(unsigned char) * RGBA_IMAGE_SIZE);
 
-  //cv::imwrite("/home/rharriso/Desktop/Test.png", imageMat);
   cv::imwrite(argv[1], imageMat);
   return 0;
 }
