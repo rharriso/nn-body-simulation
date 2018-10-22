@@ -96,7 +96,7 @@ struct mapBodyToPixelCounts
 
 struct mapPixelCountToRGBA
 {
-  const int BODY_COUNT_GRAYSCALE_RATIO = 10; // like 12 points in white
+  const int BODY_COUNT_GRAYSCALE_RATIO = 5; // like 12 points in white
   const int *pixelCount_ptr;
   unsigned char *image_ptr;
   __host__ __device__
@@ -120,9 +120,9 @@ struct mapPixelCountToRGBA
 
 int main() {
   int const BODY_COUNT = 10e6;
-  int const IMAGE_DIM = 500;
-  int const BODY_COUNT_PIXEL_SIZE = IMAGE_DIM * IMAGE_DIM;
-  int const RGBA_IMAGE_SIZE = BODY_COUNT_PIXEL_SIZE * PIXEL_RGBA_RATIO; // image has 4 values per pixels
+  int const IMAGE_DIM = 2000;
+  int const PIXEL_COUNT = IMAGE_DIM * IMAGE_DIM;
+  int const RGBA_IMAGE_SIZE = PIXEL_COUNT * PIXEL_RGBA_RATIO; // image has 4 values per pixels
 
 
   // initilize bodies
@@ -139,7 +139,7 @@ int main() {
   std::cout << "Initialized Bodies" << "\n\n";
 
   // initialize pixel counts 
-  auto pixelCounts = thrust::device_vector<int>(BODY_COUNT_PIXEL_SIZE);
+  auto pixelCounts = thrust::device_vector<int>(PIXEL_COUNT);
   auto pixelCount_ptr = thrust::raw_pointer_cast(pixelCounts.data());
   thrust::fill(pixelCounts.begin(), pixelCounts.end(), 0);
 
@@ -155,7 +155,7 @@ int main() {
   
   thrust::for_each(
     index_sequence_begin,
-    index_sequence_begin + BODY_COUNT_PIXEL_SIZE,
+    index_sequence_begin + PIXEL_COUNT,
     mapPixelCountToRGBA(pixelCount_ptr, deviceImage_ptr)
   ); 
 
@@ -188,9 +188,12 @@ int main() {
 
   // save image
   auto hostImage = thrust::host_vector<unsigned char>(RGBA_IMAGE_SIZE);
-  thrust::fill(hostImage.begin(), hostImage.end(), 127);
+  // thrust::fill(hostImage.begin(), hostImage.end(), 127);
   auto hostImage_ptr = thrust::raw_pointer_cast(hostImage.data());
-  //hostImage = deviceImage; // copy device image to host
+  //thrust::copy(hostImage.begin(), hostImage.end(), deviceImage.begin());
+  cudaDeviceSynchronize();
+  cudaMemcpy(hostImage_ptr, deviceImage_ptr, RGBA_IMAGE_SIZE, cudaMemcpyDeviceToHost);
+
   cv::Mat imageMat(IMAGE_DIM,IMAGE_DIM, CV_8UC3);
   memcpy(imageMat.data, hostImage_ptr, sizeof(unsigned char) * RGBA_IMAGE_SIZE);
 
