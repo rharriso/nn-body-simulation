@@ -1,3 +1,4 @@
-n-body
-/main-image
-/Test.png
+*.o
+/.settings
+/Debug/N-Body
+/Debug/nsightbuilddata
