@@ -58,7 +58,7 @@ all: N-Body
 N-Body: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: NVCC Linker'
-	/usr/local/cuda-9.1/bin/nvcc --cudart static --relocatable-device-code=false -gencode arch=compute_61,code=compute_61 -gencode arch=compute_61,code=sm_61 -link -o  "N-Body" $(OBJS) $(USER_OBJS) $(LIBS)
+	/usr/local/cuda-9.1/bin/nvcc --cudart static -L/home/rharriso/src/Cinder/lib --relocatable-device-code=false -gencode arch=compute_61,code=compute_61 -gencode arch=compute_61,code=sm_61 -link -o  "N-Body" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

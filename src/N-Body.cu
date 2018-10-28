@@ -83,12 +83,15 @@ struct calculateAcceleration {
 			const Body *_bodies, int _bodyCount):
 			bodies(_bodies), bodyCount(_bodyCount) {};
 
-	__host__  __device__ float3 operator()(const Body &body) {
+	__host__  __device__ float3 operator()(const int idx) {
 		float3 result { 0., 0., 0. };
+		auto body = bodies[idx];
 
 		for (int i = 0; i < bodyCount; i++) {
 			auto otherBody = bodies[i];
-			if (&otherBody == &body) continue;
+			if (idx == i) {
+				continue;
+			}
 
 
 			auto position = otherBody.position;
@@ -112,7 +115,6 @@ struct calculateAcceleration {
 
 int main(int argc, char **argv) {
 	int const BODY_COUNT = 10e6;
-	int const IMAGE_DIM = 400;
 
 	// initialize bodies
 	auto bodies = thrust::device_vector<Body>(BODY_COUNT);
@@ -125,12 +127,25 @@ int main(int argc, char **argv) {
 	std::cout << "Initialized Bodies" << "\n\n";
 
 	// calculate forces
+	index_sequence_begin = thrust::counting_iterator<unsigned int>(0);
 	auto forces = thrust::device_vector<float3>(BODY_COUNT);
+	auto h_forces = thrust::host_vector<float3>(BODY_COUNT);
 	thrust::transform(
-			bodies.begin(), bodies.end(), forces.begin(),
-			calculateAcceleration(bodies_ptr, bodies.size()));
+      index_sequence_begin, index_sequence_begin + BODY_COUNT,
+			forces.begin(), calculateAcceleration(bodies_ptr, bodies.size()));
 
 	std::cout << "Calculate Initial Forces" << "\n\n";
+
+	thrust::copy(forces.begin(), forces.end(), h_forces.begin());
+	
+  std::cout << "Copied" << "\n\n";
+
+  for (int i = 0; i < 20; i++) {
+    auto force = h_forces[i];
+		std::cout << force.x << " " << force.y << " " << force.z << '\n';
+	}
+	
+  std::cout << "Return" << "\n\n";
 
 	return 0;
 }
