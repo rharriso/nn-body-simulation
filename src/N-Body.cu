@@ -18,7 +18,7 @@ struct Body {
     Body (float _x, float _y, float _vx, float _vy):
       x(_x), y(_y), vx(_vx), vy(_vy) {};
   __host__ __device__
-    Body () {};
+    Body (): x(0.), y(0.), vx(0.), vy(0.) {};
 };
 
 /**
@@ -32,7 +32,7 @@ struct ImageCoord {
     ImageCoord (int _x, int _y, int _imageDim): x(_x), y(_y), imageDim(_imageDim) {};
 
   __host__ __device__
-    // default init
+    // default initialization
     ImageCoord (): x(0), y(0), imageDim(0) {};
 
   __host__ __device__
