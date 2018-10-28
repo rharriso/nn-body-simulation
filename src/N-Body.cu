@@ -114,7 +114,7 @@ struct calculateAcceleration {
 };
 
 int main(int argc, char **argv) {
-	int const BODY_COUNT = 10e6;
+	int const BODY_COUNT = 10e4;
 
 	// initialize bodies
 	auto bodies = thrust::device_vector<Body>(BODY_COUNT);
@@ -132,20 +132,20 @@ int main(int argc, char **argv) {
 	auto h_forces = thrust::host_vector<float3>(BODY_COUNT);
 	thrust::transform(
       index_sequence_begin, index_sequence_begin + BODY_COUNT,
-			forces.begin(), calculateAcceleration(bodies_ptr, bodies.size()));
+			forces.begin(), calculateAcceleration(bodies_ptr, BODY_COUNT));
 
 	std::cout << "Calculate Initial Forces" << "\n\n";
 
-	thrust::copy(forces.begin(), forces.end(), h_forces.begin());
+//	thrust::copy(forces.begin(), forces.end(), h_forces.begin());
 	
-  std::cout << "Copied" << "\n\n";
-
-  for (int i = 0; i < 20; i++) {
-    auto force = h_forces[i];
-		std::cout << force.x << " " << force.y << " " << force.z << '\n';
-	}
-	
-  std::cout << "Return" << "\n\n";
+//	std::cout << "Copied" << "\n\n";
+//
+//	for (int i = 0; i < 20; i++) {
+//		auto force = h_forces[i];
+//		std::cout << force.x << " " << force.y << " " << force.z << '\n';
+//	}
+//
+//	std::cout << "Return" << "\n\n";
 
 	return 0;
 }
