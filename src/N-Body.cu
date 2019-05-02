@@ -113,16 +113,17 @@ void updateVelocities(Body *bodies, int bodyCount, float dt) {
 	auto body = bodies[idx];
 
 	for(int tile = 0; tile < gridDim.x; tile++) {
-		__shared__ Body sharedBodies[BLOCK_SIZE];
-		Body tBody = bodies[tile * blockDim.x + threadIdx.x];
-		sharedBodies[threadIdx.x] = Body{tBody.position, tBody.velocity, tBody.mass};
-		__syncthreads();
+//		__shared__ Body sharedBodies[BLOCK_SIZE];
+//		Body tBody = bodies[tile * blockDim.x + threadIdx.x];
+//		sharedBodies[threadIdx.x] = Body{tBody.position, tBody.velocity, tBody.mass};
+//		__syncthreads();
 
 		for(int j = 0; j < BLOCK_SIZE; j++) {
-			accel = bodyInteraction(body, sharedBodies[j], accel);
+//			accel = bodyInteraction(body, sharedBodies[j], accel);
+			accel = bodyInteraction(body, bodies[j], accel);
 		}
 
-		__syncthreads();
+//		__syncthreads();
 	}
 
 	// update blockBody velocity
@@ -133,7 +134,7 @@ void updateVelocities(Body *bodies, int bodyCount, float dt) {
 
 
 int main(int argc, char **argv) {
-	int const BODY_COUNT = 1000;
+	int const BODY_COUNT = 10000;
 	const float dt = 0.01f;
 	int numBlocks = (BODY_COUNT + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
